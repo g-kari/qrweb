@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QRコードスキャナー</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+    
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+    }
+    
+    #reader {
+      width: 100%;
+      max-width: 350px;
+      margin: 0 auto 20px auto;
+      border: 2px solid #007bff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    
+    #result, #position {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 10px 0;
+      word-wrap: break-word;
+    }
+    
+    #result {
+      font-weight: bold;
+      color: #28a745;
+    }
+    
+    #position {
+      font-size: 14px;
+      color: #6c757d;
+      font-family: monospace;
+    }
+    
+    .status {
+      text-align: center;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      background-color: #d1ecf1;
+      border: 1px solid #bee5eb;
+      color: #0c5460;
+    }
+    
+    .error {
+      background-color: #f8d7da !important;
+      border-color: #f5c6cb !important;
+      color: #721c24 !important;
+    }
+    
+    .warning {
+      background-color: #fff3cd !important;
+      border-color: #ffeaa7 !important;
+      color: #856404 !important;
+    }
+    
+    .file-input-area {
+      border: 2px dashed #007bff;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+      background-color: #f8f9fa;
+    }
+    
+    #fileInput {
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📱 QRコードスキャナー</h1>
+    <div class="status" id="status">カメラを起動しています...</div>
+    <div id="reader"></div>
+    <div id="result" style="display:none;"></div>
+    <div id="position" style="display:none;"></div>
+    
+    <!-- ファイルアップロード用のフォールバック -->
+    <div class="file-input-area" id="fileInputArea" style="display:none;">
+      <h3>📁 ファイルからQRコードを読み取り</h3>
+      <p>カメラが使用できない場合は、QRコード画像をアップロードしてください</p>
+      <input type="file" id="fileInput" accept="image/*" />
+    </div>
+  </div>
+
+  <script>
+    function onScanSuccess(decodedText, decodedResult) {
+      // 結果表示エリアを表示
+      document.getElementById('result').style.display = 'block';
+      document.getElementById('position').style.display = 'block';
+      document.getElementById('status').textContent = 'QRコードを検出しました！';
+      
+      // QRコードの内容を表示
+      document.getElementById('result').innerText = `スキャン結果: ${decodedText}`;
+      
+      // QRコードの位置情報を表示
+      const positionDiv = document.getElementById('position');
+      if (decodedResult && decodedResult.result && decodedResult.result.resultPoints) {
+        const points = decodedResult.result.resultPoints;
+        let positionText = 'QRコードの位置情報:\n';
+        points.forEach((point, index) => {
+          positionText += `角${index + 1}: x=${Math.round(point.x)}, y=${Math.round(point.y)}\n`;
+        });
+        
+        // QRコードの中心点を計算
+        const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+        const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+        positionText += `中心点: x=${Math.round(centerX)}, y=${Math.round(centerY)}`;
+        
+        positionDiv.innerHTML = positionText.replace(/\n/g, '<br>');
+      } else {
+        positionDiv.innerHTML = '位置情報が取得できませんでした';
+      }
+    }
+
+    function onScanFailure(error) {
+      // エラーは表示しない（連続的にスキャンを試行するため）
+    }
+
+    // カメラ起動
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+      { facingMode: "environment" }, // 背面カメラを使用
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      },
+      onScanSuccess,
+      onScanFailure
+    ).then(() => {
+      document.getElementById('status').textContent = 'QRコードをカメラに向けてください';
+    }).catch((err) => {
+      console.error('カメラエラー:', err);
+      const statusElement = document.getElementById('status');
+      
+      if (err.toString().includes('NotAllowedError') || err.toString().includes('Permission')) {
+        statusElement.textContent = 'カメラの使用許可が必要です。ブラウザの設定を確認してください。';
+        statusElement.className = 'status warning';
+      } else if (err.toString().includes('NotSupportedError') || err.toString().includes('not supported')) {
+        statusElement.textContent = 'このブラウザまたは環境ではカメラが使用できません。HTTPS接続またはファイルアップロードをお試しください。';
+        statusElement.className = 'status error';
+        // ファイルアップロード機能を表示
+        document.getElementById('fileInputArea').style.display = 'block';
+        setupFileUpload();
+      } else {
+        statusElement.textContent = `カメラエラー: ${err}`;
+        statusElement.className = 'status error';
+        // ファイルアップロード機能を表示
+        document.getElementById('fileInputArea').style.display = 'block';
+        setupFileUpload();
+      }
+    });
+
+    // ファイルアップロード機能をセットアップ
+    function setupFileUpload() {
+      const fileInput = document.getElementById('fileInput');
+      if (fileInput && !fileInput.hasEventListener) {
+        fileInput.hasEventListener = true;
+        fileInput.addEventListener('change', function(e) {
+          const file = e.target.files[0];
+          if (file) {
+            const html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.scanFile(file, true)
+              .then(decodedText => {
+                // ファイルスキャン成功時は位置情報なしで結果を表示
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('position').style.display = 'block';
+                document.getElementById('status').textContent = 'ファイルからQRコードを検出しました！';
+                document.getElementById('result').innerText = `スキャン結果: ${decodedText}`;
+                document.getElementById('position').innerHTML = 'ファイルからの読み取りのため位置情報は取得できません';
+              })
+              .catch(err => {
+                console.error('ファイルスキャンエラー:', err);
+                document.getElementById('status').textContent = 'QRコードが見つかりませんでした。別の画像を試してください。';
+                document.getElementById('status').className = 'status error';
+              });
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>
