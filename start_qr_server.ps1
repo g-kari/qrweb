@@ -51,22 +51,22 @@ try {
     npx http-server -p 8443 -a 0.0.0.0 --cors -S
 } catch {
     Write-Host "HTTPS起動に失敗しました。HTTPサーバーを試します..." -ForegroundColor Yellow
+    Write-Host "注意: HTTPではスマホでカメラが動作しない可能性があります" -ForegroundColor Red
     
+    # まずWindowsでPythonサーバーを起動を試行
     try {
-        # WSL Ubuntuでpython3サーバーを起動（HTTP）
-        Write-Host "WSL UbuntuでHTTPサーバーを起動します..." -ForegroundColor Yellow
-        Write-Host "注意: HTTPではスマホでカメラが動作しない可能性があります" -ForegroundColor Red
-        wsl -d Ubuntu -e bash -c "cd /home/qrweb && python3 -m http.server 8080 --bind 0.0.0.0"
+        python --version | Out-Null
+        Write-Host "WindowsでHTTPサーバーを起動します..." -ForegroundColor Yellow
+        python -m http.server 8080 --bind 0.0.0.0
     } catch {
-        Write-Host "エラー: WSL Ubuntuでサーバーを起動できませんでした" -ForegroundColor Red
-        Write-Host "代替手段として、Windowsでサーバーを起動します..." -ForegroundColor Yellow
+        Write-Host "WindowsでPythonが見つかりません。WSL Ubuntuを試します..." -ForegroundColor Yellow
         
-        # Pythonが利用可能か確認
         try {
-            python --version | Out-Null
-            python -m http.server 8080 --bind 0.0.0.0
+            # WSL Ubuntuでpython3サーバーを起動（HTTP）
+            Write-Host "WSL UbuntuでHTTPサーバーを起動します..." -ForegroundColor Yellow
+            wsl -d Ubuntu -e bash -c "cd /home/qrweb && python3 -m http.server 8080 --bind 0.0.0.0"
         } catch {
-            Write-Host "エラー: Pythonが見つかりません" -ForegroundColor Red
+            Write-Host "エラー: WSL Ubuntuでサーバーを起動できませんでした" -ForegroundColor Red
             Write-Host "手動でサーバーを起動してください:" -ForegroundColor Yellow
             Write-Host "  npx http-server -p 8443 -S" -ForegroundColor Cyan
             Write-Host "または" -ForegroundColor Yellow
