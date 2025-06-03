@@ -24,23 +24,21 @@ echo サーバーを起動しています...
 echo 終了するには Ctrl+C を押してください
 echo.
 
-rem WSL Ubuntuでサーバーを起動
-wsl -d Ubuntu -e bash -c "cd /home/qrweb && python3 -m http.server 8080 --bind 0.0.0.0"
-
-rem エラーが発生した場合の代替手段
+rem まずWindowsでサーバーを起動を試行
+python --version >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo エラー: WSL Ubuntuでサーバーを起動できませんでした
-    echo 代替手段として、Windowsでサーバーを起動します...
+    echo Pythonが見つかりません。WSL Ubuntuでサーバーを起動します...
+    wsl -d Ubuntu -e bash -c "cd /home/qrweb && python3 -m http.server 8080 --bind 0.0.0.0"
     
-    python --version >nul 2>&1
+    rem WSLも失敗した場合の最終手段
     if errorlevel 1 (
-        echo エラー: Pythonが見つかりません
+        echo.
+        echo エラー: WSL Ubuntuでサーバーを起動できませんでした
         echo Node.jsのhttp-serverを試します...
         npx http-server -p 8080 -a 0.0.0.0 --cors
-    ) else (
-        python -m http.server 8080 --bind 0.0.0.0
     )
+) else (
+    python -m http.server 8080 --bind 0.0.0.0
 )
 
 pause

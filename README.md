@@ -16,14 +16,14 @@ start_qr_server.bat
 
 ### 2. 手動でサーバー起動
 
-#### WSL Ubuntu環境
-```bash
-python3 -m http.server 8080 --bind 0.0.0.0
-```
-
 #### Windows環境
 ```cmd
 python -m http.server 8080 --bind 0.0.0.0
+```
+
+#### WSL Ubuntu環境
+```bash
+python3 -m http.server 8080 --bind 0.0.0.0
 ```
 
 ### 3. スマホでアクセス
@@ -48,8 +48,8 @@ python -m http.server 8080 --bind 0.0.0.0
 ## トラブルシューティング
 
 ### サーバーが起動しない
-- WSL Ubuntuが正常に動作しているか確認
-- Python 3がインストールされているか確認
+- Python 3がインストールされているか確認（Windows）
+- WSL Ubuntuが正常に動作しているか確認（代替手段として）
 - ポート8080が他のアプリケーションで使用されていないか確認
 
 ### スマホからアクセスできない
