@@ -110,51 +110,6 @@
   </div>
 
   <script>
-    // QRコードの回転角度を計算する関数
-    // より正確な角度計算のため、4つの角点全てを使用して最適な辺を特定
-    function calculateQRRotation(points) {
-      if (points.length < 2) {
-        return null;
-      }
-      
-      if (points.length >= 4) {
-        // QRコードの4角点から最も適切な辺を選んで傾きを計算
-        // 通常、QRコードの検出点は時計回り順序で配置されている
-        const angles = [];
-        
-        // 各辺の角度を計算
-        for (let i = 0; i < points.length; i++) {
-          const p1 = points[i];
-          const p2 = points[(i + 1) % points.length];
-          const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
-          angles.push(angle);
-        }
-        
-        // 最も水平に近い辺を基準として使用（QRコードの上辺または下辺）
-        let bestAngle = angles[0];
-        let minAngleDiff = Math.abs(angles[0] % 90);
-        
-        for (let i = 1; i < angles.length; i++) {
-          const angleDiff = Math.abs(angles[i] % 90);
-          if (angleDiff < minAngleDiff) {
-            minAngleDiff = angleDiff;
-            bestAngle = angles[i];
-          }
-        }
-        
-        // 角度を-90〜90度の範囲に正規化
-        let rotationAngle = bestAngle;
-        while (rotationAngle > 90) rotationAngle -= 180;
-        while (rotationAngle < -90) rotationAngle += 180;
-        
-        return rotationAngle;
-      } else {
-        // フォールバック: 2点以上あれば基本的な計算を実行
-        const deltaX = points[1].x - points[0].x;
-        const deltaY = points[1].y - points[0].y;
-        return Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-      }
-    }
 
     function onScanSuccess(decodedText, decodedResult) {
       // 結果表示エリアを表示
@@ -166,63 +121,11 @@
       document.getElementById('result').innerText = `スキャン結果: ${decodedText}`;
       
       // デバッグ情報をコンソールに出力
-      console.log('Decoded result full object:', decodedResult);
-      if (decodedResult && decodedResult.result) {
-        console.log('Result points:', decodedResult.result.resultPoints);
-        console.log('Result metadata:', decodedResult.result.resultMetadata);
-      }
+      console.log('Decoded result:', decodedResult);
       
-      // QRコードの位置情報を表示
+      // 位置情報について説明を表示
       const positionDiv = document.getElementById('position');
-      if (decodedResult && decodedResult.result && decodedResult.result.resultPoints) {
-        const points = decodedResult.result.resultPoints;
-        let positionText = 'QRコードの位置情報:\n';
-        
-        // 各角点の座標を表示
-        points.forEach((point, index) => {
-          positionText += `角${index + 1}: x=${Math.round(point.x)}, y=${Math.round(point.y)}\n`;
-        });
-        
-        // QRコードの中心点を計算
-        const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
-        const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
-        positionText += `中心点: x=${Math.round(centerX)}, y=${Math.round(centerY)}\n`;
-        
-        // QRコードのサイズ（幅と高さ）を計算
-        if (points.length >= 4) {
-          const minX = Math.min(...points.map(p => p.x));
-          const maxX = Math.max(...points.map(p => p.x));
-          const minY = Math.min(...points.map(p => p.y));
-          const maxY = Math.max(...points.map(p => p.y));
-          const width = maxX - minX;
-          const height = maxY - minY;
-          positionText += `サイズ: 幅=${Math.round(width)}px, 高さ=${Math.round(height)}px\n`;
-        }
-        
-        // QRコードの傾き（回転角度）を計算
-        const rotationAngle = calculateQRRotation(points);
-        if (rotationAngle !== null) {
-          positionText += `傾き: ${Math.round(rotationAngle * 100) / 100}°`;
-        }
-        
-        positionDiv.innerHTML = positionText.replace(/\n/g, '<br>');
-      } else {
-        // 位置情報が取得できない場合の詳細なエラー情報
-        console.log('Position data not available. Decoded result structure:', decodedResult);
-        let errorMsg = '位置情報が取得できませんでした';
-        
-        if (!decodedResult) {
-          errorMsg += '<br>理由: decodedResult が null または undefined です';
-        } else if (!decodedResult.result) {
-          errorMsg += '<br>理由: decodedResult.result が存在しません';
-        } else if (!decodedResult.result.resultPoints) {
-          errorMsg += '<br>理由: resultPoints が存在しません';
-        } else if (decodedResult.result.resultPoints.length === 0) {
-          errorMsg += '<br>理由: resultPoints が空の配列です';
-        }
-        
-        positionDiv.innerHTML = errorMsg;
-      }
+      positionDiv.innerHTML = 'html5-qrcodeライブラリはQRコードの位置情報を提供しません。<br>QRコードの内容のみが取得可能です。';
     }
 
     function onScanFailure(error) {
