@@ -29,7 +29,9 @@
       margin-bottom: 30px;
     }
     
+    /* Reader container position relative for stamp overlay */
     #reader {
+      position: relative;
       width: 100%;
       max-width: 350px;
       margin: 0 auto 20px auto;
@@ -37,7 +39,7 @@
       border-radius: 10px;
       overflow: hidden;
     }
-    
+
     #result, #position {
       background-color: #f8f9fa;
       border: 1px solid #dee2e6;
@@ -109,13 +111,68 @@
     #fileInput {
       margin: 10px 0;
     }
+    
+    /* Stamp Animation Styles */
+    #stampOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    
+    .stamp {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      background: radial-gradient(circle, #ff4444, #cc0000);
+      border: 4px solid #990000;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: white;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transform: scale(0) rotate(0deg);
+      opacity: 0;
+    }
+    
+    .stamp.animate {
+      animation: stampPress 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.35) forwards;
+    }
+    
+    @keyframes stampPress {
+      0% {
+        transform: scale(0) rotate(0deg);
+        opacity: 0;
+      }
+      50% {
+        transform: scale(1.2) rotate(5deg);
+        opacity: 1;
+      }
+      70% {
+        transform: scale(0.9) rotate(-2deg);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 0.8;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>📱 QRコードスキャナー</h1>
     <div class="status" id="status">カメラを起動しています...</div>
-    <div id="reader"></div>
+    <div id="reader">
+      <div id="stampOverlay"></div>
+    </div>
     <div id="result" style="display:none;"></div>
     <div id="position" style="display:none;"></div>
     
@@ -195,7 +252,102 @@
         <pre>${cornersText}</pre>
       `;
 
+      // スタンプアニメーションを実行
+      showStampAnimation(positionInfo);
+
       console.log('QR Position Info:', positionInfo);
+    }
+
+    // スタンプアニメーションを表示する関数
+    function showStampAnimation(positionInfo) {
+      const stampOverlay = document.getElementById('stampOverlay');
+      const readerElement = document.getElementById('reader');
+      
+      // 既存のスタンプを削除
+      stampOverlay.innerHTML = '';
+      
+      // reader要素のサイズと位置を取得
+      const readerRect = readerElement.getBoundingClientRect();
+      const video = readerElement.querySelector('video');
+      
+      if (video && video.videoWidth > 0 && video.videoHeight > 0) {
+        const videoRect = video.getBoundingClientRect();
+        
+        // ビデオ内での相対位置を計算
+        const scaleX = videoRect.width / video.videoWidth;
+        const scaleY = videoRect.height / video.videoHeight;
+        
+        // QRコードの中心位置をビデオ表示サイズにスケール
+        const stampX = positionInfo.center.x * scaleX;
+        const stampY = positionInfo.center.y * scaleY;
+        
+        // スタンプ要素を作成
+        const stamp = document.createElement('div');
+        stamp.className = 'stamp';
+        stamp.innerHTML = '✓';
+        
+        // 位置とサイズを設定
+        stamp.style.left = `${stampX - 40}px`; // スタンプの半分のサイズを引く
+        stamp.style.top = `${stampY - 40}px`;
+        stamp.style.transform = `scale(0) rotate(${positionInfo.rotation}deg)`;
+        
+        // スタンプをオーバーレイに追加
+        stampOverlay.appendChild(stamp);
+        
+        // アニメーション開始
+        setTimeout(() => {
+          stamp.classList.add('animate');
+        }, 100);
+        
+        // 3秒後にスタンプを削除
+        setTimeout(() => {
+          if (stamp.parentNode) {
+            stamp.remove();
+          }
+        }, 3000);
+      } else {
+        // ビデオが利用できない場合は簡易版を使用
+        showSimpleStampAnimation();
+      }
+    }
+
+    // 簡易スタンプアニメーション（位置情報なしの場合）
+    function showSimpleStampAnimation() {
+      const stampOverlay = document.getElementById('stampOverlay');
+      const readerElement = document.getElementById('reader');
+      
+      // 既存のスタンプを削除
+      stampOverlay.innerHTML = '';
+      
+      // reader要素の中央に配置
+      const readerRect = readerElement.getBoundingClientRect();
+      const centerX = readerElement.offsetWidth / 2;
+      const centerY = readerElement.offsetHeight / 2;
+      
+      // スタンプ要素を作成
+      const stamp = document.createElement('div');
+      stamp.className = 'stamp';
+      stamp.innerHTML = '✓';
+      
+      // 中央に位置を設定
+      stamp.style.left = `${centerX - 40}px`;
+      stamp.style.top = `${centerY - 40}px`;
+      stamp.style.transform = 'scale(0) rotate(0deg)';
+      
+      // スタンプをオーバーレイに追加
+      stampOverlay.appendChild(stamp);
+      
+      // アニメーション開始
+      setTimeout(() => {
+        stamp.classList.add('animate');
+      }, 100);
+      
+      // 3秒後にスタンプを削除
+      setTimeout(() => {
+        if (stamp.parentNode) {
+          stamp.remove();
+        }
+      }, 3000);
     }
 
     // カメラとjsQRを使用したQR検出
@@ -293,6 +445,9 @@
           const positionDiv = document.getElementById('position');
           positionDiv.innerHTML = '<strong>⚠️ 位置情報制限</strong><br>html5-qrcodeライブラリでは詳細な位置情報を取得できません。<br>基本的なQRコード内容のみ表示されます。';
           
+          // 簡易スタンプアニメーション（中央に表示）
+          showSimpleStampAnimation();
+          
           console.log('Decoded result (html5-qrcode):', decodedResult);
         },
         function(error) {
@@ -353,6 +508,9 @@
               
               const positionDiv = document.getElementById('position');
               positionDiv.innerHTML = '<strong>📁 ファイルスキャン</strong><br>ファイルからの読み取りでは詳細な位置情報は取得できませんでした。<br>リアルタイムスキャンで詳細情報を取得できます。';
+              
+              // 簡易スタンプアニメーション
+              showSimpleStampAnimation();
             })
             .catch(err => {
               console.error('ファイルスキャンエラー:', err);
