@@ -29,8 +29,17 @@
       margin-bottom: 30px;
     }
     
+    /* Reader container position relative for stamp overlay */
+    #reader {
+      position: relative;
+      width: 100%;
+      max-width: 350px;
+      margin: 0 auto 20px auto;
+      border: 2px solid #007bff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
 
-    
     #result, #position {
       background-color: #f8f9fa;
       border: 1px solid #dee2e6;
@@ -155,17 +164,6 @@
         opacity: 0.8;
       }
     }
-    
-    /* Reader container position relative for stamp overlay */
-    #reader {
-      position: relative;
-      width: 100%;
-      max-width: 350px;
-      margin: 0 auto 20px auto;
-      border: 2px solid #007bff;
-      border-radius: 10px;
-      overflow: hidden;
-    }
   </style>
 </head>
 <body>
@@ -272,7 +270,7 @@
       const readerRect = readerElement.getBoundingClientRect();
       const video = readerElement.querySelector('video');
       
-      if (video) {
+      if (video && video.videoWidth > 0 && video.videoHeight > 0) {
         const videoRect = video.getBoundingClientRect();
         
         // ビデオ内での相対位置を計算
@@ -307,6 +305,9 @@
             stamp.remove();
           }
         }, 3000);
+      } else {
+        // ビデオが利用できない場合は簡易版を使用
+        showSimpleStampAnimation();
       }
     }
 
