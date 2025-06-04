@@ -360,6 +360,7 @@
               document.getElementById('status').className = 'status error';
             });
         }
+        URL.revokeObjectURL(img.src); // Release the object URL to free up memory
       };
       
       img.src = URL.createObjectURL(file);
