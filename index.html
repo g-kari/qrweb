@@ -131,7 +131,16 @@
         // QRコードの中心点を計算
         const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
         const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
-        positionText += `中心点: x=${Math.round(centerX)}, y=${Math.round(centerY)}`;
+        positionText += `中心点: x=${Math.round(centerX)}, y=${Math.round(centerY)}\n`;
+        
+        // QRコードの傾き（回転角度）を計算
+        if (points.length >= 2) {
+          // 最初の2点を使って傾きを計算（通常はQRコードの上辺）
+          const deltaX = points[1].x - points[0].x;
+          const deltaY = points[1].y - points[0].y;
+          const rotationAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+          positionText += `傾き: ${Math.round(rotationAngle * 100) / 100}°`;
+        }
         
         positionDiv.innerHTML = positionText.replace(/\n/g, '<br>');
       } else {
