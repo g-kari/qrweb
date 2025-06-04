@@ -168,14 +168,18 @@
       // デバッグ情報をコンソールに出力
       console.log('Decoded result full object:', decodedResult);
       if (decodedResult && decodedResult.result) {
-        console.log('Result points:', decodedResult.result.resultPoint);
+        console.log('Result points:', decodedResult.result.resultPoint || decodedResult.result.resultPoints);
         console.log('Result metadata:', decodedResult.result.resultMetadata);
       }
       
       // QRコードの位置情報を表示
       const positionDiv = document.getElementById('position');
-      if (decodedResult && decodedResult.result && decodedResult.result.resultPoint) {
-        const points = decodedResult.result.resultPoint;
+      // Try both property names for backward compatibility
+      const resultPoints = decodedResult && decodedResult.result && 
+                           (decodedResult.result.resultPoint || decodedResult.result.resultPoints);
+      
+      if (decodedResult && decodedResult.result && resultPoints) {
+        const points = resultPoints;
         let positionText = 'QRコードの位置情報:\n';
         
         // 各角点の座標を表示
@@ -215,10 +219,11 @@
           errorMsg += '<br>理由: decodedResult が null または undefined です';
         } else if (!decodedResult.result) {
           errorMsg += '<br>理由: decodedResult.result が存在しません';
-        } else if (!decodedResult.result.resultPoint) {
-          errorMsg += '<br>理由: resultPoint が存在しません';
-        } else if (decodedResult.result.resultPoint.length === 0) {
-          errorMsg += '<br>理由: resultPoint が空の配列です';
+        } else if (!decodedResult.result.resultPoint && !decodedResult.result.resultPoints) {
+          errorMsg += '<br>理由: resultPoint/resultPoints が存在しません';
+        } else if ((decodedResult.result.resultPoint && decodedResult.result.resultPoint.length === 0) ||
+                   (decodedResult.result.resultPoints && decodedResult.result.resultPoints.length === 0)) {
+          errorMsg += '<br>理由: resultPoint/resultPoints が空の配列です';
         }
         
         positionDiv.innerHTML = errorMsg;
