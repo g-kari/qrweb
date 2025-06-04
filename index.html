@@ -200,6 +200,7 @@
 
     // カメラとjsQRを使用したQR検出
     function initCamera() {
+      console.log('Initializing camera...');
       video = document.createElement('video');
       canvas = document.createElement('canvas');
       canvasContext = canvas.getContext('2d');
@@ -208,6 +209,7 @@
         video: { facingMode: 'environment' } 
       })
       .then(function(stream) {
+        console.log('Camera access granted');
         video.srcObject = stream;
         video.setAttribute('playsinline', true);
         video.play();
@@ -234,19 +236,26 @@
         canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
-        });
+        
+        try {
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
 
-        if (code) {
-          const positionInfo = calculateQRPosition(code.location);
-          displayQRResult(code.data, positionInfo);
-          
-          // 検出後、少し待ってから再開（連続検出を防ぐ）
-          setTimeout(() => {
+          if (code && code.location) {
+            console.log('QR code detected:', code.data);
+            const positionInfo = calculateQRPosition(code.location);
+            displayQRResult(code.data, positionInfo);
+            
+            // 検出後、少し待ってから再開（連続検出を防ぐ）
+            setTimeout(() => {
+              animationId = requestAnimationFrame(tick);
+            }, 2000);
+          } else {
             animationId = requestAnimationFrame(tick);
-          }, 2000);
-        } else {
+          }
+        } catch (error) {
+          console.error('QR scanning error:', error);
           animationId = requestAnimationFrame(tick);
         }
       } else {
@@ -357,9 +366,11 @@
     }
 
     // 初期化
-    document.addEventListener('DOMContentLoaded', function() {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCamera);
+    } else {
       initCamera();
-    });
+    }
   </script>
 </body>
 </html>
