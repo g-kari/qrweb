@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QRコードスキャナー</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -55,6 +56,23 @@
       font-size: 14px;
       color: #6c757d;
       font-family: monospace;
+      line-height: 1.6;
+    }
+    
+    #position pre {
+      background-color: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 3px;
+      padding: 8px;
+      margin: 8px 0;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    
+    #reader video {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
     }
     
     .status {
@@ -110,8 +128,50 @@
   </div>
 
   <script>
+    let video;
+    let canvas;
+    let canvasContext;
+    let animationId;
 
-    function onScanSuccess(decodedText, decodedResult) {
+    // QR位置情報を計算する関数
+    function calculateQRPosition(location) {
+      const corners = [
+        location.topLeftCorner,
+        location.topRightCorner,
+        location.bottomRightCorner,
+        location.bottomLeftCorner
+      ];
+
+      // 中心点を計算
+      const centerX = corners.reduce((sum, corner) => sum + corner.x, 0) / 4;
+      const centerY = corners.reduce((sum, corner) => sum + corner.y, 0) / 4;
+
+      // QRコードのサイズを計算（対角線の平均）
+      const width = Math.sqrt(
+        Math.pow(location.topRightCorner.x - location.topLeftCorner.x, 2) + 
+        Math.pow(location.topRightCorner.y - location.topLeftCorner.y, 2)
+      );
+      const height = Math.sqrt(
+        Math.pow(location.bottomLeftCorner.x - location.topLeftCorner.x, 2) + 
+        Math.pow(location.bottomLeftCorner.y - location.topLeftCorner.y, 2)
+      );
+
+      // 回転角度を計算（上辺を基準）
+      const deltaX = location.topRightCorner.x - location.topLeftCorner.x;
+      const deltaY = location.topRightCorner.y - location.topLeftCorner.y;
+      const rotationRadians = Math.atan2(deltaY, deltaX);
+      const rotationDegrees = rotationRadians * (180 / Math.PI);
+
+      return {
+        center: { x: Math.round(centerX), y: Math.round(centerY) },
+        corners: corners,
+        size: { width: Math.round(width), height: Math.round(height) },
+        rotation: Math.round(rotationDegrees * 100) / 100 // 小数点2位まで
+      };
+    }
+
+    // QR検出結果を表示する関数
+    function displayQRResult(decodedText, positionInfo) {
       // 結果表示エリアを表示
       document.getElementById('result').style.display = 'block';
       document.getElementById('position').style.display = 'block';
@@ -120,82 +180,197 @@
       // QRコードの内容を表示
       document.getElementById('result').innerText = `スキャン結果: ${decodedText}`;
       
-      // デバッグ情報をコンソールに出力
-      console.log('Decoded result:', decodedResult);
-      
-      // 位置情報について説明を表示
+      // 位置情報を表示
       const positionDiv = document.getElementById('position');
-      positionDiv.innerHTML = 'html5-qrcodeライブラリはQRコードの位置情報を提供しません。<br>QRコードの内容のみが取得可能です。';
+      const cornersText = positionInfo.corners.map((corner, index) => 
+        `  角${index + 1}: (${corner.x}, ${corner.y})`
+      ).join('\n');
+      
+      positionDiv.innerHTML = `
+        <strong>🎯 QRコード位置情報</strong><br>
+        <strong>中心座標:</strong> (${positionInfo.center.x}, ${positionInfo.center.y})<br>
+        <strong>サイズ:</strong> ${positionInfo.size.width} × ${positionInfo.size.height} px<br>
+        <strong>回転角度:</strong> ${positionInfo.rotation}°<br>
+        <strong>4つの角の座標:</strong><br>
+        <pre>${cornersText}</pre>
+      `;
+
+      console.log('QR Position Info:', positionInfo);
     }
 
-    function onScanFailure(error) {
-      // エラーは表示しない（連続的にスキャンを試行するため）
+    // カメラとjsQRを使用したQR検出
+    function initCamera() {
+      console.log('Initializing camera...');
+      video = document.createElement('video');
+      canvas = document.createElement('canvas');
+      canvasContext = canvas.getContext('2d');
+
+      navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      })
+      .then(function(stream) {
+        console.log('Camera access granted');
+        video.srcObject = stream;
+        video.setAttribute('playsinline', true);
+        video.play();
+        
+        // video要素をreaderコンテナに追加
+        const readerDiv = document.getElementById('reader');
+        readerDiv.innerHTML = '';
+        readerDiv.appendChild(video);
+        
+        document.getElementById('status').textContent = 'QRコードをカメラに向けてください';
+        requestAnimationFrame(tick);
+      })
+      .catch(function(err) {
+        console.error('カメラエラー:', err);
+        // html5-qrcodeライブラリを使用してフォールバック
+        fallbackToHtml5QrCode(err);
+      });
     }
 
-    // カメラ起動
-    const html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start(
-      { facingMode: "environment" }, // 背面カメラを使用
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-      },
-      onScanSuccess,
-      onScanFailure
-    ).then(() => {
-      document.getElementById('status').textContent = 'QRコードをカメラに向けてください';
-    }).catch((err) => {
-      console.error('カメラエラー:', err);
+    function tick() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+        
+        try {
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
+
+          if (code && code.location) {
+            console.log('QR code detected:', code.data);
+            const positionInfo = calculateQRPosition(code.location);
+            displayQRResult(code.data, positionInfo);
+            
+            // 検出後、少し待ってから再開（連続検出を防ぐ）
+            setTimeout(() => {
+              animationId = requestAnimationFrame(tick);
+            }, 2000);
+          } else {
+            animationId = requestAnimationFrame(tick);
+          }
+        } catch (error) {
+          console.error('QR scanning error:', error);
+          animationId = requestAnimationFrame(tick);
+        }
+      } else {
+        animationId = requestAnimationFrame(tick);
+      }
+    }
+
+    // html5-qrcodeを使用したフォールバック
+    function fallbackToHtml5QrCode(error) {
       const statusElement = document.getElementById('status');
       
-      if (err.toString().includes('NotAllowedError') || err.toString().includes('Permission')) {
+      if (error.toString().includes('NotAllowedError') || error.toString().includes('Permission')) {
         statusElement.textContent = 'カメラの使用許可が必要です。ブラウザの設定を確認してください。';
         statusElement.className = 'status warning';
-      } else if (err.toString().includes('NotSupportedError') || err.toString().includes('not supported')) {
-        statusElement.textContent = 'このブラウザまたは環境ではカメラが使用できません。HTTPS接続またはファイルアップロードをお試しください。';
-        statusElement.className = 'status error';
-        // ファイルアップロード機能を表示
-        document.getElementById('fileInputArea').style.display = 'block';
         setupFileUpload();
-      } else {
-        statusElement.textContent = `カメラエラー: ${err}`;
-        statusElement.className = 'status error';
-        // ファイルアップロード機能を表示
-        document.getElementById('fileInputArea').style.display = 'block';
-        setupFileUpload();
+        return;
       }
-    });
+
+      console.log('jsQRでのカメラアクセスに失敗、html5-qrcodeにフォールバック');
+      
+      const html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        },
+        function(decodedText, decodedResult) {
+          document.getElementById('result').style.display = 'block';
+          document.getElementById('position').style.display = 'block';
+          document.getElementById('status').textContent = 'QRコードを検出しました！';
+          document.getElementById('result').innerText = `スキャン結果: ${decodedText}`;
+          
+          const positionDiv = document.getElementById('position');
+          positionDiv.innerHTML = '<strong>⚠️ 位置情報制限</strong><br>html5-qrcodeライブラリでは詳細な位置情報を取得できません。<br>基本的なQRコード内容のみ表示されます。';
+          
+          console.log('Decoded result (html5-qrcode):', decodedResult);
+        },
+        function(error) {
+          // エラーは表示しない（連続的にスキャンを試行するため）
+        }
+      ).then(() => {
+        document.getElementById('status').textContent = 'QRコードをカメラに向けてください（フォールバックモード）';
+      }).catch((err) => {
+        console.error('html5-qrcodeエラー:', err);
+        statusElement.textContent = 'カメラが使用できません。ファイルアップロードをお試しください。';
+        statusElement.className = 'status error';
+        setupFileUpload();
+      });
+    }
 
     // ファイルアップロード機能をセットアップ
     function setupFileUpload() {
+      document.getElementById('fileInputArea').style.display = 'block';
+      
       const fileInput = document.getElementById('fileInput');
       if (fileInput && !fileInput.hasEventListener) {
         fileInput.hasEventListener = true;
         fileInput.addEventListener('change', function(e) {
           const file = e.target.files[0];
           if (file) {
-            const html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.scanFile(file, true)
-              .then(decodedText => {
-                // ファイルスキャン成功時も位置情報の取得を試行
-                document.getElementById('result').style.display = 'block';
-                document.getElementById('position').style.display = 'block';
-                document.getElementById('status').textContent = 'ファイルからQRコードを検出しました！';
-                document.getElementById('result').innerText = `スキャン結果: ${decodedText}`;
-                
-                // ファイルスキャンでも位置情報が取得できる場合があるので確認
-                const positionDiv = document.getElementById('position');
-                positionDiv.innerHTML = 'ファイルからの読み取りでは詳細な位置情報は取得できません<br>リアルタイムスキャンをお試しください';
-              })
-              .catch(err => {
-                console.error('ファイルスキャンエラー:', err);
-                document.getElementById('status').textContent = 'QRコードが見つかりませんでした。別の画像を試してください。';
-                document.getElementById('status').className = 'status error';
-              });
+            processImageFile(file);
           }
         });
       }
+    }
+
+    // 画像ファイルからQRコードを検出
+    function processImageFile(file) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code) {
+          const positionInfo = calculateQRPosition(code.location);
+          displayQRResult(code.data, positionInfo);
+        } else {
+          // jsQRで失敗した場合、html5-qrcodeでリトライ
+          const html5QrCode = new Html5Qrcode("reader");
+          html5QrCode.scanFile(file, true)
+            .then(decodedText => {
+              document.getElementById('result').style.display = 'block';
+              document.getElementById('position').style.display = 'block';
+              document.getElementById('status').textContent = 'ファイルからQRコードを検出しました！';
+              document.getElementById('result').innerText = `スキャン結果: ${decodedText}`;
+              
+              const positionDiv = document.getElementById('position');
+              positionDiv.innerHTML = '<strong>📁 ファイルスキャン</strong><br>ファイルからの読み取りでは詳細な位置情報は取得できませんでした。<br>リアルタイムスキャンで詳細情報を取得できます。';
+            })
+            .catch(err => {
+              console.error('ファイルスキャンエラー:', err);
+              document.getElementById('status').textContent = 'QRコードが見つかりませんでした。別の画像を試してください。';
+              document.getElementById('status').className = 'status error';
+            });
+        }
+        URL.revokeObjectURL(img.src); // Release the object URL to free up memory
+      };
+      
+      img.src = URL.createObjectURL(file);
+    }
+
+    // 初期化
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCamera);
+    } else {
+      initCamera();
     }
   </script>
 </body>
