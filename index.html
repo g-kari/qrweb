@@ -111,6 +111,7 @@
 
   <script>
     // QRコードの回転角度を計算する関数
+    // より正確な角度計算のため、4つの角点全てを使用して最適な辺を特定
     function calculateQRRotation(points) {
       if (points.length < 2) {
         return null;
