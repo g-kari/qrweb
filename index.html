@@ -164,23 +164,170 @@
         opacity: 0.8;
       }
     }
+    
+    /* Stamp Rally Navigation */
+    .nav-tabs {
+      display: flex;
+      background-color: #f8f9fa;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    
+    .nav-tab {
+      flex: 1;
+      padding: 12px 16px;
+      text-align: center;
+      background-color: #e9ecef;
+      color: #6c757d;
+      cursor: pointer;
+      border: none;
+      font-size: 16px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-tab.active {
+      background-color: #007bff;
+      color: white;
+    }
+    
+    .nav-tab:hover:not(.active) {
+      background-color: #dee2e6;
+    }
+    
+    /* Views */
+    .view {
+      display: none;
+    }
+    
+    .view.active {
+      display: block;
+    }
+    
+    /* Collection View */
+    .collection-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .collection-progress {
+      background-color: #e9ecef;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .progress-bar {
+      background-color: #e9ecef;
+      border-radius: 8px;
+      height: 20px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      background: linear-gradient(90deg, #28a745, #20c997);
+      height: 100%;
+      border-radius: 8px;
+      transition: width 0.5s ease;
+    }
+    
+    .stamps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 15px;
+      padding: 20px 0;
+    }
+    
+    .collected-stamp {
+      background: radial-gradient(circle, #28a745, #20c997);
+      border: 3px solid #1e7e34;
+      border-radius: 50%;
+      width: 100px;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: white;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      margin: 0 auto;
+      position: relative;
+    }
+    
+    .stamp-info {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #6c757d;
+    }
+    
+    .empty-collection {
+      text-align: center;
+      padding: 40px 20px;
+      color: #6c757d;
+    }
+    
+    .empty-collection .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>📱 QRコードスキャナー</h1>
-    <div class="status" id="status">カメラを起動しています...</div>
-    <div id="reader">
-      <div id="stampOverlay"></div>
-    </div>
-    <div id="result" style="display:none;"></div>
-    <div id="position" style="display:none;"></div>
     
-    <!-- ファイルアップロード用のフォールバック -->
-    <div class="file-input-area" id="fileInputArea" style="display:none;">
-      <h3>📁 ファイルからQRコードを読み取り</h3>
-      <p>カメラが使用できない場合は、QRコード画像をアップロードしてください</p>
-      <input type="file" id="fileInput" accept="image/*" />
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('scanner')">🔍 スキャナー</button>
+      <button class="nav-tab" onclick="switchTab('collection')">🏆 スタンプ帳</button>
+    </div>
+    
+    <!-- Scanner View -->
+    <div id="scannerView" class="view active">
+      <div class="status" id="status">カメラを起動しています...</div>
+      <div id="reader">
+        <div id="stampOverlay"></div>
+      </div>
+      <div id="result" style="display:none;"></div>
+      <div id="position" style="display:none;"></div>
+      
+      <!-- ファイルアップロード用のフォールバック -->
+      <div class="file-input-area" id="fileInputArea" style="display:none;">
+        <h3>📁 ファイルからQRコードを読み取り</h3>
+        <p>カメラが使用できない場合は、QRコード画像をアップロードしてください</p>
+        <input type="file" id="fileInput" accept="image/*" />
+      </div>
+    </div>
+    
+    <!-- Collection View -->
+    <div id="collectionView" class="view">
+      <div class="collection-header">
+        <h2>🏆 スタンプコレクション</h2>
+      </div>
+      
+      <div class="collection-progress">
+        <div class="progress-info">
+          <strong id="progressText">0 / 0 スタンプ収集</strong>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+        <div id="progressMessage">QRコードをスキャンしてスタンプを集めよう！</div>
+      </div>
+      
+      <div id="stampsContainer">
+        <div class="empty-collection" id="emptyCollection">
+          <div class="icon">📋</div>
+          <p>まだスタンプがありません<br>QRコードをスキャンしてスタンプを集めましょう！</p>
+        </div>
+        <div class="stamps-grid" id="stampsGrid" style="display: none;"></div>
+      </div>
     </div>
   </div>
 
@@ -189,6 +336,150 @@
     let canvas;
     let canvasContext;
     let animationId;
+
+    // Stamp Rally System
+    const StampRally = {
+      // Get collected stamps from localStorage
+      getCollectedStamps() {
+        const stamps = localStorage.getItem('qr-stamps');
+        return stamps ? JSON.parse(stamps) : [];
+      },
+      
+      // Save collected stamps to localStorage
+      saveCollectedStamps(stamps) {
+        localStorage.setItem('qr-stamps', JSON.stringify(stamps));
+      },
+      
+      // Generate unique stamp ID from QR content
+      generateStampId(qrContent) {
+        // Simple hash function for generating unique IDs
+        let hash = 0;
+        for (let i = 0; i < qrContent.length; i++) {
+          const char = qrContent.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash; // Convert to 32-bit integer
+        }
+        return Math.abs(hash).toString(36);
+      },
+      
+      // Get stamp emoji based on QR content
+      getStampEmoji(qrContent) {
+        const emojis = ['🌟', '🎉', '🎊', '🏆', '⭐', '💎', '🎈', '🎁', '🌈', '🔥', '✨', '🎯', '🎪', '🎭', '🎨'];
+        const hash = this.generateStampId(qrContent);
+        const index = parseInt(hash, 36) % emojis.length;
+        return emojis[index];
+      },
+      
+      // Add new stamp to collection
+      addStamp(qrContent, positionInfo = null) {
+        const stamps = this.getCollectedStamps();
+        const stampId = this.generateStampId(qrContent);
+        
+        // Check if stamp already exists
+        const existingStamp = stamps.find(stamp => stamp.id === stampId);
+        if (existingStamp) {
+          existingStamp.scanCount = (existingStamp.scanCount || 1) + 1;
+          existingStamp.lastScanned = new Date().toISOString();
+        } else {
+          const newStamp = {
+            id: stampId,
+            content: qrContent,
+            emoji: this.getStampEmoji(qrContent),
+            collectedAt: new Date().toISOString(),
+            lastScanned: new Date().toISOString(),
+            scanCount: 1,
+            position: positionInfo
+          };
+          stamps.push(newStamp);
+        }
+        
+        this.saveCollectedStamps(stamps);
+        this.updateCollectionDisplay();
+        return !existingStamp; // Return true if it's a new stamp
+      },
+      
+      // Update collection display
+      updateCollectionDisplay() {
+        const stamps = this.getCollectedStamps();
+        const totalStamps = stamps.length;
+        
+        // Update progress
+        const progressText = document.getElementById('progressText');
+        const progressFill = document.getElementById('progressFill');
+        const progressMessage = document.getElementById('progressMessage');
+        
+        if (progressText) {
+          progressText.textContent = `${totalStamps} スタンプ収集`;
+        }
+        
+        if (progressFill) {
+          // For progress bar, we'll show completion as stamps collected
+          const progressPercentage = totalStamps > 0 ? Math.min(100, (totalStamps / 10) * 100) : 0;
+          progressFill.style.width = `${progressPercentage}%`;
+        }
+        
+        if (progressMessage) {
+          if (totalStamps === 0) {
+            progressMessage.textContent = 'QRコードをスキャンしてスタンプを集めよう！';
+          } else if (totalStamps < 5) {
+            progressMessage.textContent = 'いいペースです！もっとスタンプを集めましょう！';
+          } else if (totalStamps < 10) {
+            progressMessage.textContent = 'すごい！たくさんのスタンプを集めています！';
+          } else {
+            progressMessage.textContent = '🎉 スタンプマスター！素晴らしいコレクションです！';
+          }
+        }
+        
+        // Update stamps grid
+        const emptyCollection = document.getElementById('emptyCollection');
+        const stampsGrid = document.getElementById('stampsGrid');
+        
+        if (totalStamps === 0) {
+          if (emptyCollection) emptyCollection.style.display = 'block';
+          if (stampsGrid) stampsGrid.style.display = 'none';
+        } else {
+          if (emptyCollection) emptyCollection.style.display = 'none';
+          if (stampsGrid) {
+            stampsGrid.style.display = 'grid';
+            stampsGrid.innerHTML = '';
+            
+            stamps.forEach(stamp => {
+              const stampElement = document.createElement('div');
+              stampElement.innerHTML = `
+                <div class="collected-stamp">
+                  ${stamp.emoji}
+                </div>
+                <div class="stamp-info">
+                  <div>ID: ${stamp.id}</div>
+                  <div>スキャン回数: ${stamp.scanCount}</div>
+                  <div>${new Date(stamp.collectedAt).toLocaleDateString('ja-JP')}</div>
+                </div>
+              `;
+              stampsGrid.appendChild(stampElement);
+            });
+          }
+        }
+      }
+    };
+
+    // Tab switching functionality
+    function switchTab(tabName) {
+      // Update tab buttons
+      const tabs = document.querySelectorAll('.nav-tab');
+      tabs.forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      // Update views
+      const views = document.querySelectorAll('.view');
+      views.forEach(view => view.classList.remove('active'));
+      
+      if (tabName === 'scanner') {
+        document.getElementById('scannerView').classList.add('active');
+      } else if (tabName === 'collection') {
+        document.getElementById('collectionView').classList.add('active');
+        StampRally.updateCollectionDisplay();
+      }
+    }
 
     // QR位置情報を計算する関数
     function calculateQRPosition(location) {
@@ -252,14 +543,17 @@
         <pre>${cornersText}</pre>
       `;
 
+      // スタンプラリーにスタンプを追加
+      const isNewStamp = StampRally.addStamp(decodedText, positionInfo);
+      
       // スタンプアニメーションを実行
-      showStampAnimation(positionInfo);
+      showStampAnimation(positionInfo, isNewStamp);
 
       console.log('QR Position Info:', positionInfo);
     }
 
     // スタンプアニメーションを表示する関数
-    function showStampAnimation(positionInfo) {
+    function showStampAnimation(positionInfo, isNewStamp = true) {
       const stampOverlay = document.getElementById('stampOverlay');
       const readerElement = document.getElementById('reader');
       
@@ -284,7 +578,17 @@
         // スタンプ要素を作成
         const stamp = document.createElement('div');
         stamp.className = 'stamp';
-        stamp.innerHTML = '✓';
+        
+        // 新しいスタンプか既存スタンプかで表示を変更
+        if (isNewStamp) {
+          stamp.innerHTML = '🆕';
+          stamp.style.background = 'radial-gradient(circle, #28a745, #20c997)';
+          stamp.style.borderColor = '#1e7e34';
+        } else {
+          stamp.innerHTML = '✓';
+          stamp.style.background = 'radial-gradient(circle, #ffc107, #e0a800)';
+          stamp.style.borderColor = '#d39e00';
+        }
         
         // 位置とサイズを設定
         stamp.style.left = `${stampX - 40}px`; // スタンプの半分のサイズを引く
@@ -307,12 +611,12 @@
         }, 3000);
       } else {
         // ビデオが利用できない場合は簡易版を使用
-        showSimpleStampAnimation();
+        showSimpleStampAnimation(isNewStamp);
       }
     }
 
     // 簡易スタンプアニメーション（位置情報なしの場合）
-    function showSimpleStampAnimation() {
+    function showSimpleStampAnimation(isNewStamp = true) {
       const stampOverlay = document.getElementById('stampOverlay');
       const readerElement = document.getElementById('reader');
       
@@ -327,7 +631,17 @@
       // スタンプ要素を作成
       const stamp = document.createElement('div');
       stamp.className = 'stamp';
-      stamp.innerHTML = '✓';
+      
+      // 新しいスタンプか既存スタンプかで表示を変更
+      if (isNewStamp) {
+        stamp.innerHTML = '🆕';
+        stamp.style.background = 'radial-gradient(circle, #28a745, #20c997)';
+        stamp.style.borderColor = '#1e7e34';
+      } else {
+        stamp.innerHTML = '✓';
+        stamp.style.background = 'radial-gradient(circle, #ffc107, #e0a800)';
+        stamp.style.borderColor = '#d39e00';
+      }
       
       // 中央に位置を設定
       stamp.style.left = `${centerX - 40}px`;
@@ -445,8 +759,11 @@
           const positionDiv = document.getElementById('position');
           positionDiv.innerHTML = '<strong>⚠️ 位置情報制限</strong><br>html5-qrcodeライブラリでは詳細な位置情報を取得できません。<br>基本的なQRコード内容のみ表示されます。';
           
+          // スタンプラリーにスタンプを追加
+          const isNewStamp = StampRally.addStamp(decodedText, null);
+          
           // 簡易スタンプアニメーション（中央に表示）
-          showSimpleStampAnimation();
+          showSimpleStampAnimation(isNewStamp);
           
           console.log('Decoded result (html5-qrcode):', decodedResult);
         },
@@ -509,8 +826,11 @@
               const positionDiv = document.getElementById('position');
               positionDiv.innerHTML = '<strong>📁 ファイルスキャン</strong><br>ファイルからの読み取りでは詳細な位置情報は取得できませんでした。<br>リアルタイムスキャンで詳細情報を取得できます。';
               
+              // スタンプラリーにスタンプを追加
+              const isNewStamp = StampRally.addStamp(decodedText, null);
+              
               // 簡易スタンプアニメーション
-              showSimpleStampAnimation();
+              showSimpleStampAnimation(isNewStamp);
             })
             .catch(err => {
               console.error('ファイルスキャンエラー:', err);
@@ -526,9 +846,15 @@
 
     // 初期化
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initCamera);
+      document.addEventListener('DOMContentLoaded', function() {
+        initCamera();
+        // Initialize stamp rally display
+        StampRally.updateCollectionDisplay();
+      });
     } else {
       initCamera();
+      // Initialize stamp rally display
+      StampRally.updateCollectionDisplay();
     }
   </script>
 </body>
